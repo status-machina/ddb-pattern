@@ -29,10 +29,169 @@ npm install @status-machina/ddb-pattern
 1. Import the necessary functions and types from the package.
 
 ```typescript
-import { saveEventsTransact, queryLatestEvent } from '@status-machina/ddb-pattern';
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { EventBase, withTimeAndId } from "@status-machina/ddb-pattern";
+import { IdKeyName, InputOf } from "@status-machina/ddb-pattern";
+import {
+  queryLatestEvent,
+  queryLatestEvents,
+  saveEventsTransact,
+} from "@status-machina/ddb-pattern";
+import { ddbItemsFrom, getPK } from "@status-machina/ddb-pattern"; // Import key-utils
 ```
 
-2. Use the provided utilities to handle event data in your application.
+2. Define your event types.
+
+```typescript
+export enum StoreEventTypes {
+  PRICE_LOWERED = "PRICE_LOWERED",
+  PRICE_RAISED = "PRICE_RAISED",
+}
+
+export type StoreEventBase = EventBase<StoreEventTypes>;
+
+export interface PriceLowered extends StoreEventBase {
+  type: StoreEventTypes.PRICE_LOWERED;
+  data: {
+    store_id: string;
+    product_id: string;
+    price: number;
+  };
+}
+
+export interface PriceRaised extends StoreEventBase {
+  type: StoreEventTypes.PRICE_RAISED;
+  data: {
+    store_id: string;
+    product_id: string;
+    price: number;
+  };
+}
+
+export type StoreEvents = PriceLowered | PriceRaised;
+```
+
+3. Create utility functions for saving and querying events.
+
+```typescript
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { saveEventsTransact, ddbItemsFrom, withTimeAndId } from "@status-machina/ddb-pattern";
+import { InputOf } from "@status-machina/ddb-pattern";
+
+const EVENTS_TABLE_NAME = process.env.EVENTS_TABLE_NAME;
+
+if (!EVENTS_TABLE_NAME) {
+  throw new Error(
+    "Environment variable EVENTS_TABLE_NAME is required but not defined."
+  );
+}
+
+export const savePriceEvent = async <T extends StoreEvents>({
+  ddbClient,
+  eventInput,
+}: {
+  ddbClient: DynamoDBDocumentClient;
+  eventInput: InputOf<T>;
+}) => {
+  await saveEventsTransact(ddbClient, {
+    eventItems: ddbItemsFrom(withTimeAndId(eventInput), "store_id"),
+    tableName: EVENTS_TABLE_NAME,
+  });
+};
+
+/**
+    Gets the latest StoreEvent of the specified type,
+    based on the storeId and and a specified model
+*/
+export const getLatestStoreEvent = async <
+  K extends StoreEventTypes,
+  T extends StoreEvents & { type: K },
+  M extends keyof T & IdKeyName,
+>(
+  ddbClient: DynamoDBDocumentClient,
+  options: {
+    eventType: K;
+    modelKey?: M;
+    modelId?: string;
+    storeId: string;
+    after?: string;
+  },
+) => {
+  // In this example, events are partitioned by store_id, so store_id is required for lookup
+  const pk = getPK<K>({
+    eventType: options.eventType,
+    modelKey: options.modelKey,
+    modelId: options.modelId,
+    partitionId: options.storeId,
+    partitionKey: "store_id",
+  });
+  return await queryLatestEvent<T>(ddbClient, {
+    table_name: EVENTS_TABLE_NAME,
+    pk,
+    after: options.after,
+  });
+};
+
+/**
+    Gets the latest StoreEvents of the specified type,
+    based on the storeId and and a specified model
+*/
+export const getLatestStoreEvents = async <
+  K extends StoreEventTypes,
+  T extends StoreEvents & { type: K },
+  M extends keyof T & IdKeyName,
+>(
+  ddbClient: DynamoDBDocumentClient,
+  options: {
+    eventType: K;
+    modelKey?: M;
+    modelId?: string;
+    storeId: string;
+    after?: string;
+  },
+) => {
+  // In this example, events are partitioned by store_id, so store_id is required for lookup
+  const pk = getPK<K>({
+    eventType: options.eventType,
+    modelKey: options.modelKey,
+    modelId: options.modelId,
+    partitionId: options.storeId,
+    partitionKey: "store_id",
+  });
+  return await queryLatestEvents<T>(ddbClient, {
+    table_name: EVENTS_TABLE_NAME,
+    pk,
+    after: options.after,
+  });
+};
+
+/**
+    Resolves to a sorted array with all of the events of a given type,
+    with the specified storeId and model type/id (if provided).
+*/
+export const getPriceEventStream = async <K extends StoreEventTypes>(
+  ddbClient: DynamoDBDocumentClient,
+  options: {
+    eventTypes: K[];
+    storeId: string;
+    modelId?: string;
+    modelKey?: keyof K;
+    after?: string;
+  },
+) => {
+  const allEvents = await Promise.all(
+    options.eventTypes.map((eventType) =>
+      getLatestStoreEvents(ddbClient, {
+        eventType,
+        storeId: options.storeId,
+        modelId: options.modelId,
+        after: options.after,
+      }),
+    ),
+  );
+  return allEvents.flat().sort((a, b) => (a.id < b.id ? 1 : -1));
+};
+```
 
 For detailed usage, please refer to the source code or the examples provided within.
 

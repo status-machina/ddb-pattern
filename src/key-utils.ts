@@ -1,33 +1,47 @@
 import { EventDynamoDBItem, IdKeyName } from "./type-utils";
 
-/**
-    Builds the primary key. Useful for lookups.
-*/
-export const primaryKeyBuilder = <T>({
-  modelType,
+export const getPK = <T>({
+  modelKey,
   modelId,
   eventType,
+  partitionKey,
+  partitionId,
 }: {
-  modelType: string;
-  modelId: string;
+  modelKey?: IdKeyName;
+  modelId?: string;
   eventType: T;
-}): string => {
-  return `${eventType}::${modelType}::${modelId}`;
+  partitionKey?: IdKeyName;
+  partitionId?: string;
+}) => {
+  const partitionPart =
+    partitionKey && partitionId
+      ? `${getModelType(partitionKey)}::${partitionId}::`
+      : "";
+  const modelPart =
+    modelKey && modelId ? `${getModelType(modelKey)}::${modelId}::` : "";
+
+  return `${partitionPart}${modelPart}${eventType}`;
 };
 
 const rgx = /_id$/;
 export const getModelType = (key: IdKeyName) => key.split(rgx)[0].toUpperCase();
 const isIdKey = (key: string): key is IdKeyName => rgx.test(key);
 
-const modelKeysFrom = <T>(obj: Record<string, any>, type: T): string[] => {
+const modelKeysFrom = <T>(
+  obj: Record<string, any>,
+  type: T,
+  partitionKey?: IdKeyName,
+): string[] => {
   const keys: string[] = [];
-  for (const [key, val] of Object.entries(obj)) {
-    if (isIdKey(key)) {
+  for (const [modelKey, modelId] of Object.entries(obj)) {
+    if (isIdKey(modelKey)) {
       keys.push(
-        primaryKeyBuilder({
-          modelType: getModelType(key),
-          modelId: val,
+        getPK({
+          modelKey,
+          modelId,
           eventType: type,
+          partitionKey,
+          partitionId: partitionKey ? obj[partitionKey] : undefined,
         }),
       );
     }
@@ -51,20 +65,23 @@ export const ddbItemsFrom = <
 ): EventDynamoDBItem<T>[] => {
   const data = event.data;
   const insertion_time = new Date().toISOString();
-  const partitionPrefix = partitionKey
-    ? `${getModelType(partitionKey)}::${data[partitionKey]}::`
-    : "";
   const identityItem: EventDynamoDBItem<T> = {
-    pk: `${partitionPrefix}${data.type}`,
+    pk: partitionKey
+      ? getPK({
+          partitionKey,
+          partitionId: data[partitionKey],
+          eventType: data.type,
+        })
+      : getPK({ eventType: data.type }),
     sk: data.id,
     insertion_time,
     event: event,
   };
   const items: EventDynamoDBItem<T>[] = [identityItem];
 
-  for (const modelKey of modelKeysFrom(data, event.type)) {
+  for (const modelKey of modelKeysFrom(data, event.type, partitionKey)) {
     const keyedEvent: EventDynamoDBItem<T> = {
-      pk: `${partitionPrefix}${modelKey}`,
+      pk: modelKey,
       sk: data.id,
       insertion_time,
       event,
