@@ -1,4 +1,37 @@
-import { EventDynamoDBItem, IdKeyName } from "./type-utils";
+import { monotonicFactory, ulid } from "ulidx";
+import {
+  DdbInputOf,
+  EventBase,
+  IdKeyName,
+  IdKeyOf,
+  InputOf,
+} from "./type-utils";
+
+export const withTimeAndId = <
+  K extends string,
+  T extends Record<K, any> & { timestamp: string; id: string },
+>(
+  event: InputOf<T>,
+  date = new Date(),
+  stamp = ulid,
+): DdbInputOf<T> => {
+  return {
+    ...event,
+    timestamp: date.toISOString(),
+    id: stamp(date.valueOf()),
+  } as T;
+};
+
+export const sequentialStampAndId = <
+  K extends string,
+  T extends Record<K, any> & { timestamp: string; id: string },
+>(
+  events: InputOf<T>[],
+): DdbInputOf<T>[] => {
+  const date = new Date();
+  const stamp = monotonicFactory();
+  return events.map((event) => withTimeAndId(event, date, stamp));
+};
 
 export const getPK = <T>({
   modelKey,
@@ -50,22 +83,17 @@ const modelKeysFrom = <T>(
 };
 
 export const ddbItemsFrom = <
-  K,
-  T extends {
-    type: K;
-    id: string;
-    data: Record<string, any> & {
-      [idKey: IdKeyName]: string | undefined;
-    };
-  },
-  P extends keyof T["data"] & IdKeyName,
+  S,
+  K extends EventBase<S>,
+  T extends DdbInputOf<K>,
+  P extends IdKeyOf<T>,
 >(
   event: T,
   partitionKey?: P,
-): EventDynamoDBItem<T>[] => {
+): EventBase<K["type"]>[] => {
   const data = event.data;
-  const insertion_time = new Date().toISOString();
-  const identityItem: EventDynamoDBItem<T> = {
+  const timestamp = new Date().toISOString();
+  const identityItem: EventBase<K["type"]> = {
     pk: partitionKey
       ? getPK({
           partitionKey,
@@ -73,18 +101,22 @@ export const ddbItemsFrom = <
           eventType: data.type,
         })
       : getPK({ eventType: data.type }),
-    sk: data.id,
-    insertion_time,
-    event: event,
+    sk: event.id,
+    id: event.id,
+    timestamp,
+    type: event.type,
+    data: event.data,
   };
-  const items: EventDynamoDBItem<T>[] = [identityItem];
+  const items: EventBase<K["type"]>[] = [identityItem];
 
-  for (const modelKey of modelKeysFrom(data, event.type, partitionKey)) {
-    const keyedEvent: EventDynamoDBItem<T> = {
+  for (const modelKey of modelKeysFrom(data, event.data.type, partitionKey)) {
+    const keyedEvent: EventBase<K["type"]> = {
       pk: modelKey,
-      sk: data.id,
-      insertion_time,
-      event,
+      sk: event.id,
+      id: event.id,
+      timestamp,
+      type: event.type,
+      data: event.data,
     };
     items.push(keyedEvent);
   }

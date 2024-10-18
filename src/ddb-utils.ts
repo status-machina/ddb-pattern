@@ -4,9 +4,7 @@ import {
   TransactWriteCommand,
   TransactWriteCommandInput,
 } from "@aws-sdk/lib-dynamodb";
-import { EventDynamoDBItem } from "./type-utils";
-
-type NotUndefined<T> = T extends undefined ? never : T;
+import { EventBase, NotUndefined } from "./type-utils";
 
 export const saveEventsTransact = async <T>(
   ddbClient: DynamoDBDocumentClient,
@@ -14,7 +12,7 @@ export const saveEventsTransact = async <T>(
     eventItems,
     tableName,
   }: {
-    eventItems: EventDynamoDBItem<T>[];
+    eventItems: EventBase<T>[];
     tableName: string;
   },
 ): Promise<boolean> => {
@@ -64,10 +62,7 @@ export const queryLatestEvent = async <T>(
 ): Promise<T | undefined> => {
   const queryCommand = new QueryCommand({
     TableName: options.table_name,
-    KeyConditionExpression: "pk = :pk and #sk > :after",
-    ExpressionAttributeNames: {
-      "#sk": "sortKey", // Replace 'sortKey' with your actual sort key attribute name
-    },
+    KeyConditionExpression: "pk = :pk and sk > :after",
     ExpressionAttributeValues: {
       ":pk": options.pk,
       ":after": options.after ? options.after : null,
@@ -94,10 +89,7 @@ export const queryLatestEvents = async <T>(
   do {
     const queryCommand = new QueryCommand({
       TableName: options.table_name,
-      KeyConditionExpression: "pk = :pk and #sk > :after",
-      ExpressionAttributeNames: {
-        "#sk": "sortKey", // Replace 'sortKey' with your actual sort key attribute name
-      },
+      KeyConditionExpression: "pk = :pk and sk > :after",
       ExpressionAttributeValues: {
         ":pk": options.pk,
         ":after": options.after ? options.after : null,
