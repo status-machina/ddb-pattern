@@ -21,14 +21,18 @@ export const createEventFunctions = <T extends string, K extends EventBase<T>>(
     });
   };
 
-  const getLatestEvent = async <E extends K, M extends IdKeyOf<E>>({
+  const getLatestEvent = async <
+    J extends T,
+    E extends K & { type: J },
+    M extends IdKeyOf<E>,
+  >({
     eventType,
     modelKey,
     modelId,
     partitionId,
     after,
   }: {
-    eventType: T;
+    eventType: J;
     modelKey?: M;
     modelId?: string;
     partitionId?: string;
@@ -48,14 +52,18 @@ export const createEventFunctions = <T extends string, K extends EventBase<T>>(
     });
   };
 
-  const getLatestEvents = async <E extends K, M extends IdKeyOf<E>>({
+  const getLatestEvents = async <
+    J extends T,
+    E extends K & { type: J },
+    M extends IdKeyOf<E>,
+  >({
     eventType,
     modelKey,
     modelId,
     partitionId,
     after,
   }: {
-    eventType: T;
+    eventType: J;
     modelKey?: M;
     modelId?: string;
     partitionId?: string;
@@ -76,9 +84,9 @@ export const createEventFunctions = <T extends string, K extends EventBase<T>>(
   };
 
   const getEventStream = async <
-    E extends K,
+    J extends T,
+    E extends K & { type: J },
     M extends IdKeyOf<E>,
-    TK extends T,
   >({
     eventTypes,
     modelId,
@@ -86,7 +94,7 @@ export const createEventFunctions = <T extends string, K extends EventBase<T>>(
     partitionId,
     after,
   }: {
-    eventTypes: TK[];
+    eventTypes: J[];
     modelId?: string;
     modelKey?: M;
     partitionId?: string;
@@ -105,9 +113,7 @@ export const createEventFunctions = <T extends string, K extends EventBase<T>>(
     );
     return allEvents
       .flat()
-      .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)) as (K & {
-      type: TK;
-    })[];
+      .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)) as E[];
   };
   return {
     saveEvent,
