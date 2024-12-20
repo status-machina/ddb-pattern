@@ -5,7 +5,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "TESTCONTAINERS_RYUK_DISABLED=true vitest run",
+    "test:watch": "TESTCONTAINERS_RYUK_DISABLED=true vitest",
+    "test:coverage": "vitest run --coverage",
     "prepare": "npm run build"
   },
   "peerDependencies": {
@@ -13,7 +15,12 @@
     "ulidx": "^2.x.x"
   },
   "devDependencies": {
-    "typescript": "^5.x.x"
+    "@aws-sdk/client-dynamodb": "^3.x.x",
+    "@aws-sdk/lib-dynamodb": "^3.x.x",
+    "typescript": "^5.x.x",
+    "vitest": "^2.x.x",
+    "testcontainers": "^10.7.1",
+    "ulidx": "^2.x.x"
   },
   "publishConfig": {
     "access": "public"
