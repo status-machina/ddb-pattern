@@ -6,6 +6,50 @@
 
 The `@status-machina/ddb-pattern` package provides utility functions and types for working with events and DynamoDB in a structured manner. It enables the creation, saving, and querying of events while leveraging ULID for unique identifiers and timestamping.
 
+### What is a "Stream" in this library?
+
+A "stream" is a collection of events matching a specified type. Usually, a stream will also have unifying key matching some sort of "model".
+
+#### Example: Todo List
+
+As an example, to obtain a complete "stream" of events for a todo list, you would specify the event types as:
+```typescript
+[
+  TodoEventTypes.TODO_CREATED,
+  TodoEventTypes.TODO_COMPLETED,
+  // ...Any other todo-related events
+  TodoEventTypes.TODO_DELETED
+]
+```
+
+You would also specify the `list_id` as the model key.
+
+#### Example: Todo Item
+
+Alternatively, you could create a stream of events just for a single todo item, by specifying the event types as:
+```typescript
+[
+  TodoEventTypes.TODO_CREATED,
+  TodoEventTypes.TODO_COMPLETED,
+  // ...Any other todo-related events
+  TodoEventTypes.TODO_DELETED
+]
+```
+
+You would also specify the `todo_id` as the model key.
+
+#### Example: User's archived todos
+
+You could also create a stream of events for a user's archived todos, by specifying the event types as:
+```typescript
+[
+  TodoEventTypes.TODO_ARCHIVED,
+]
+``` 
+
+You would also specify the `user_id` as the model key.
+
+
 ## **IMPORTANT NOTES**
 
 - This library intentionally does not expose methods for **UPDATING** or otherwise mutating events. It follows a write-only paradigm.
