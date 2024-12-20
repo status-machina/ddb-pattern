@@ -113,7 +113,7 @@ export const createEventFunctions = <T extends string, K extends EventBase<T>>(
     );
     return allEvents
       .flat()
-      .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)) as E[];
+      .sort((a, b) => (a.timestamp > b.timestamp ? 1 : -1)) as E[];
   };
   return {
     saveEvent,

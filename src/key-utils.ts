@@ -58,6 +58,7 @@ export const getPK = <T>({
 
 const rgx = /_id$/;
 export const getModelType = (key: IdKeyName) => key.split(rgx)[0].toUpperCase();
+
 const isIdKey = (key: string): key is IdKeyName => rgx.test(key);
 
 const modelKeysFrom = <T>(
@@ -68,15 +69,14 @@ const modelKeysFrom = <T>(
   const keys: string[] = [];
   for (const [modelKey, modelId] of Object.entries(obj)) {
     if (isIdKey(modelKey)) {
-      keys.push(
-        getPK({
-          modelKey,
-          modelId,
-          eventType: type,
-          partitionKey,
-          partitionId: partitionKey ? obj[partitionKey] : undefined,
-        }),
-      );
+      const pk = getPK({
+        modelKey,
+        modelId,
+        eventType: type,
+        partitionKey,
+        partitionId: partitionKey ? obj[partitionKey] : undefined,
+      });
+      keys.push(pk);
     }
   }
   return keys;
@@ -92,15 +92,15 @@ export const ddbItemsFrom = <
   partitionKey?: P,
 ): EventBase<K["type"]>[] => {
   const data = event.data;
-  const timestamp = new Date().toISOString();
+  const timestamp = event.timestamp;
   const identityItem: EventBase<K["type"]> = {
     pk: partitionKey
       ? getPK({
           partitionKey,
           partitionId: data[partitionKey],
-          eventType: data.type,
+          eventType: event.type,
         })
-      : getPK({ eventType: data.type }),
+      : getPK({ eventType: event.type }),
     sk: event.id,
     id: event.id,
     timestamp,
@@ -109,7 +109,7 @@ export const ddbItemsFrom = <
   };
   const items: EventBase<K["type"]>[] = [identityItem];
 
-  for (const modelKey of modelKeysFrom(data, event.data.type, partitionKey)) {
+  for (const modelKey of modelKeysFrom(data, event.type, partitionKey)) {
     const keyedEvent: EventBase<K["type"]> = {
       pk: modelKey,
       sk: event.id,

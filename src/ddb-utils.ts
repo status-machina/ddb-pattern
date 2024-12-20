@@ -38,7 +38,7 @@ export const saveEventsTransact = async <T>(
       });
 
       await ddbClient.send(transactWriteCommand);
-      return true; // Successfully wrote
+      return true;
     } catch (error) {
       console.error("Error during transaction:", error);
       retries++;
@@ -62,11 +62,12 @@ export const queryLatestEvent = async <T>(
 ): Promise<T | undefined> => {
   const queryCommand = new QueryCommand({
     TableName: options.table_name,
-    KeyConditionExpression: "pk = :pk and sk > :after",
-    ExpressionAttributeValues: {
-      ":pk": options.pk,
-      ":after": options.after ? options.after : null,
-    },
+    KeyConditionExpression: options.after 
+      ? "pk = :pk and sk > :after"
+      : "pk = :pk",
+    ExpressionAttributeValues: options.after
+      ? { ":pk": options.pk, ":after": options.after }
+      : { ":pk": options.pk },
     Limit: 1,
   });
 
@@ -89,11 +90,12 @@ export const queryLatestEvents = async <T>(
   do {
     const queryCommand = new QueryCommand({
       TableName: options.table_name,
-      KeyConditionExpression: "pk = :pk and sk > :after",
-      ExpressionAttributeValues: {
-        ":pk": options.pk,
-        ":after": options.after ? options.after : null,
-      },
+      KeyConditionExpression: options.after 
+        ? "pk = :pk and sk > :after"
+        : "pk = :pk",
+      ExpressionAttributeValues: options.after
+        ? { ":pk": options.pk, ":after": options.after }
+        : { ":pk": options.pk },
       Limit: 25,
       ScanIndexForward: true,
       ExclusiveStartKey: lastEvaluatedKey,
