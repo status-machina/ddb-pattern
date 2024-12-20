@@ -10,6 +10,14 @@
     "test:coverage": "vitest run --coverage",
     "prepare": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/status-machina/ddb-pattern.git"
+  },
+  "bugs": {
+    "url": "https://github.com/status-machina/ddb-pattern/issues"
+  },
+  "homepage": "https://github.com/status-machina/ddb-pattern#readme",
   "peerDependencies": {
     "@aws-sdk/lib-dynamodb": "^3.x.x",
     "ulidx": "^2.x.x"
